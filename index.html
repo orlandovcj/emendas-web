@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Emendas PIX - SC</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Biblioteca Plotly para Mapas e Gráficos -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+
+    <div class="layout-container">
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <h2>🎯 Filtros</h2>
+            
+            <label for="select-municipio"><strong>Município:</strong></label>
+            <select id="select-municipio" onchange="aplicarFiltros()">
+                <option value="">Todos os Municípios</option>
+            </select>
+            
+            <label for="select-ano" style="margin-top: 15px; display: block;"><strong>Ano (Emenda):</strong></label>
+            <small style="color: #64748b; display: block; margin-bottom: 5px;">* Segure CTRL para selecionar mais de um. (Se vazio = Todos)</small>
+            <select id="select-ano" multiple onchange="aplicarFiltros()" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 1rem; height: 80px;">
+                <!-- A opção "Todos os Anos" foi removida daqui -->
+            </select>
+            
+            <label for="select-autor" style="margin-top: 15px; display: block;"><strong>Autor da Emenda:</strong></label>
+            <select id="select-autor" onchange="aplicarFiltros()" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 1rem;">
+                <option value="">Todos os Autores</option>
+            </select>
+            
+            <label for="select-empresa" style="margin-top: 15px; display: block;"><strong>Empresa Credora:</strong></label>
+            <select id="select-empresa" onchange="aplicarFiltros()" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 1rem;">
+                <option value="">Todas as Empresas</option>
+            </select>
+
+            <div class="metricas-globais" id="metricas-globais" style="margin-top: 20px;">
+                <h3>Resumo do Estado</h3>
+                <p>Carregando...</p>
+            </div>
+            
+            <div class="update-info">
+                <h3>🔄 Última Atualização</h3>
+                <p id="data-atualizacao">Carregando...</p>
+            </div>
+        </aside>
+
+        <!-- CONTEÚDO PRINCIPAL -->
+        <main class="main-content">
+            <h1>Painel de Emendas PIX (RP6) - Santa Catarina</h1>
+            
+            <!-- Div do Mapa -->
+            <div id="mapa-sc" style="width: 100%; height: 550px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);"></div>
+            
+            <!-- Legenda do Mapa -->
+            <div id="container-mapa-legenda" style="position: relative; margin-bottom: 30px;">
+
+                <div id="mapa-sc" style="width: 100%; height: 550px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);"></div>
+                <div id="legenda-mapa" style="position: absolute; top: 15px; left: 15px; background: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-size: 0.85rem; color: #334155; z-index: 10; max-width: 220px;">
+                    <strong style="display: block; margin-bottom: 10px; font-size: 0.9rem; color: #1e3a8a;">🗺️ Legenda do Mapa</strong>
+                    
+                    <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                        <div style="width: 12px; height: 12px; background: #fde047; border-radius: 50%; margin-right: 8px;"></div>
+                        <span>Tamanho = Volume em R$</span>
+                    </div>
+                    
+                    <div style="display: flex; align-items: center; margin-bottom: 5px;">
+                        <div style="width: 12px; height: 12px; background: #440154; border-radius: 50%; margin-right: 8px;"></div>
+                        <span>Cor = % de Execução</span>
+                    </div>
+                    
+                    <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                        <div style="width: 12px; height: 12px; background: #dc2626; border-radius: 50%; margin-right: 8px;"></div>
+                        <span>Empresa Credora Filtrada</span>
+                    </div>
+                    
+                    <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 8px 0;">
+                    <small style="color: #64748b;">Clique nas bolhas para ver os detalhes do município.</small>
+                </div>
+            </div>
+
+            <!-- Seção detalhes do município -->
+            <div id="detalhes-municipio" style="display: none; margin-top: 30px;">
+                <button onclick="voltarParaMapa()" style="margin-bottom: 15px; padding: 8px 15px; cursor: pointer; background: #e2e8f0; border: none; border-radius: 6px; font-weight: bold;">⬅️ Voltar ao Mapa Geral</button>
+                
+                <h2 id="titulo-municipio"></h2>
+                
+                <!-- Sistema de Abas -->
+                <div class="tabs">
+                    <button class="tab-btn active" onclick="openTab(event, 'aba-emendas')">📂 Emendas & Parlamentares</button>
+                    <button class="tab-btn" onclick="openTab(event, 'aba-obras')">🚧 Empenhos</button>
+                    <button class="tab-btn" onclick="openTab(event, 'aba-empresas')">🏢 Empresas</button>
+                    <button class="tab-btn" onclick="openTab(event, 'aba-historico')">📝 Histórico</button>
+                </div>
+
+                <div id="aba-emendas" class="tab-content active">
+                    <h3>Emendas Recebidas (Clique em uma linha para ver o Extrato em Tempo Real)</h3>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Autor</th>
+                                <th>Banco/Conta</th>
+                                <th>Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-emendas-body"></tbody>
+                    </table>
+
+                    <!-- NOVA SEÇÃO: Detalhes da API -->
+                    <div id="detalhe-api-emenda" style="display: none; margin-top: 30px; padding: 20px; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+                        <h3 id="titulo-api-emenda" style="color: #1e3a8a; margin-bottom: 15px;"></h3>
+                    <!-- NOVA SEÇÃO: Objeto e Conta (API Plano/Executor) -->
+                    <div id="detalhes-plano" style="display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap;">
+                        <!-- Card do Objeto -->
+                        <div style="flex: 2; min-width: 300px; padding: 20px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px;">
+                            <h4 style="color: #1e40af; margin-bottom: 10px; text-transform: uppercase; font-size: 0.9rem; letter-spacing: 0.5px;">🎯 Objeto Pactuado</h4>
+                            <div id="texto-objeto" style="font-style: italic; color: #1e3a8a; line-height: 1.5;">Aguardando seleção...</div>
+                            <div id="detalhes-plano-extra" style="margin-top: 15px; font-size: 0.85rem; color: #475569; border-top: 1px solid #bfdbfe; padding-top: 10px;"></div>
+                        </div>
+                        
+                        <!-- Card da Conta -->
+                        <div style="flex: 1; min-width: 300px; padding: 20px; background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: #f8fafc; border-radius: 12px; border: 1px solid #475569;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #475569; padding-bottom: 10px; margin-bottom: 12px;">
+                                <span style="font-weight: 700; font-size: 0.9rem; letter-spacing: 0.5px; color: #94a3b8;">💳 CONTAS DE EXECUÇÃO</span>
+                                <span id="badge-conta" style="background: #f1f5f9; color: #475569; padding: 4px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">CADASTRADA</span>
+                            </div>
+                            <div id="dados-conta" style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.8;">
+                                <div>Carregando dados bancários...</div>
+                            </div>
+                        </div>
+                    </div>                        
+                        <div id="resumo-financeiro" style="display: flex; gap: 15px; margin-bottom: 20px;">
+                            <!-- JS vai preencher os cartões de Crédito/Débito/Saldo aqui -->
+                        </div>
+                        <h4 id="titulo-grafico-pj" style="margin-top: 30px; display: none;">📊 Concentração de Débitos por Pessoa Jurídica</h4>
+                        <div id="grafico-pj" style="width: 100%; height: 400px;"></div>
+                        <h4 id="titulo-extrato" style="margin-top: 30px; display: none;">💸 Movimentações Financeiras da Conta Corrente (Extrato)</h4>
+                        <table id="tabela-extrato-completa" class="data-table" style="margin-top: 10px; font-size: 0.85rem; display: none;">
+                            <thead>
+                                <tr>
+                                    <th style="width: 100px;">Data</th>
+                                    <th style="width: 120px;">Operação</th>
+                                    <th>Descrição</th>
+                                    <th>Origem/Destino</th>
+                                    <th style="width: 120px;">CNPJ/CPF</th>
+                                    <th style="width: 140px; text-align: right;">Valor</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-extrato-body"></tbody>
+                        </table>
+                        <!-- NOVA SEÇÃO: Licitações Similares -->
+                        <h4 style="margin-top: 30px;">🔍 Licitações Municipais Associadas (Por Similaridade de Objeto)</h4>
+                        <p style="font-size: 0.85rem; color: #64748b;">Algoritmo de Jaccard Ponderado comparando o objeto da emenda com as licitações do TCE-SC.</p>
+                        
+                        <label for="slider-similaridade">Sensibilidade mínima:</label>
+                        <input type="range" id="slider-similaridade" min="10" max="90" value="25" oninput="document.getElementById('valor-slider').innerText = this.value + '%'" style="width: 200px; vertical-align: middle;">
+                        <span id="valor-slider" style="font-weight: bold; color: #2563eb;">25%</span>
+                        
+                        <table class="data-table" style="margin-top: 15px;">
+                            <thead>
+                                <tr>
+                                    <th>Edital</th>
+                                    <th>Modalidade</th>
+                                    <th>Objeto da Licitação</th>
+                                    <th>Origem do Casamento</th>
+                                    <th>Similaridade</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-similaridade-body"></tbody>
+                        </table>                        
+                    </div>
+                </div>
+
+                <div id="aba-obras" class="tab-content" style="display: none;">
+                    <h3>🚧 Empenhos de Obras e Mat. Permanentes</h3>
+                    
+                    <div style="margin-bottom: 15px; display: flex; gap: 15px; align-items: center;">
+                        <label><input type="radio" name="filtro_emp" value="todos" checked onchange="filtrarEmpenhos()"> Todos</label>
+                        <label><input type="radio" name="filtro_emp" value="vinculados" onchange="filtrarEmpenhos()"> 🔗 Vinculados a Emendas</label>
+                        <label><input type="radio" name="filtro_emp" value="gerais" onchange="filtrarEmpenhos()"> ⚖️ Gerais</label>
+                    </div>
+
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Nº Empenho</th>
+                                <th>Ano</th>
+                                <th>Data</th>
+                                <th>Credor</th>
+                                <th>Licitação / Contrato</th>
+                                <th>Descrição do Objeto</th>
+                                <th>Vl. Empenhado</th>
+                                <th>Vl. Pago</th>
+                                <th>Origem/Vínculo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-obras-body"></tbody>
+                    </table>
+                </div>
+
+                <div id="aba-empresas" class="tab-content" style="display: none;">
+                    <h3>🏢 Empresas Contratadas e Pagas</h3>
+                    <p style="font-size: 0.85rem; color: #64748b;">Ranking consolidado das empresas fornecedoras e valores pagos via base oficial do Transferegov (Extratos).</p>
+                    
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 40px;">
+                        <div style="flex: 2; min-width: 300px;">
+                            <h4>Pagamentos às Empresas (Extratos Transferegov)</h4>
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>CNPJ</th>
+                                        <th>Razão Social</th>
+                                        <th>Qtd. Pagamentos</th>
+                                        <th>Valor Total Pago</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabela-empresas-body"></tbody>
+                            </table>
+                        </div>
+                        <div style="flex: 1; min-width: 300px;">
+                            <h4>Top 5 Empresas (por Valor Pago)</h4>
+                            <div id="grafico-top5-empresas" style="width: 100%; height: 400px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- NOVA SEÇÃO: EMPENHOS DO TCE -->
+                    <div style="border-top: 2px solid #e2e8f0; padding-top: 30px;">
+                        <h3>🚧 Empresas com Empenhos Registrados no TCE-SC</h3>
+                        <p style="font-size: 0.85rem; color: #64748b;">Ranking consolidado das empresas construtoras e fornecedoras com empenhos locais vinculados a obras e materiais permanentes.</p>
+                        
+                        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                            <div style="flex: 2; min-width: 300px;">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>CNPJ/CPF</th>
+                                            <th>Nome do Credor (RFB)</th>
+                                            <th>Qtd. Empenhos</th>
+                                            <th>Total Empenhado (R$)</th>
+                                            <th>Total Pago (R$)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tabela-credores-tce-body"></tbody>
+                                </table>
+                            </div>
+                            <div style="flex: 1; min-width: 300px;">
+                                <h4>Top 5 Empresas (por Valor Empenhado TCE)</h4>
+                                <div id="grafico-top5-credores-tce" style="width: 100%; height: 400px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="aba-historico" class="tab-content" style="display: none;">
+                    <h3>📝 Detalhes e Histórico Textual</h3>
+                    <p style="font-size: 0.85rem; color: #64748b;">Busque por palavras-chave nos empenhos (ex: asfalto, creche, ginásio, rua).</p>
+                    
+                    <input type="text" id="input-busca-historico" placeholder="Digite uma palavra-chave..." oninput="filtrarHistorico()" style="width: 100%; padding: 10px; font-size: 1rem; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 20px;">
+                    
+                    <div id="cards-historico" style="display: flex; flex-direction: column; gap: 15px;">
+                        <!-- O JS vai preencher os cartões aqui -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script src="js/similaridade.js"></script>
+</body>
+</html>
